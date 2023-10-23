@@ -1,3 +1,4 @@
+import os.path
 import requests
 import aiohttp
 import asyncio
@@ -38,13 +39,19 @@ async def get_dm_content(session, url):
 
 def write_dms_to_csv(vid, dms, is_var):
     page_url = f'https://v.qq.com/x/cover/mzc00200t7i1qwp/{vid}.html'
-    page_html = requests.get(page_url).content
+    r = requests.get(page_url)
+    while not r.ok:
+        print('... Fetching page HTML ...')
+    page_html = r.content
     bs = BeautifulSoup(page_html, 'html.parser')
     title = bs.title.contents[0].split("_")[0]
     if is_var:
         folder_name = title.split("《")[1].split("》")[0]
     else:
         folder_name = title
+    if not os.path.exists(f'dms/{folder_name}'):
+        os.makedirs(f'dms/{folder_name}')
+        print(f'--- New Folder dms/{folder_name} Created ---')
     with open(f'dms/{folder_name}/{title}_{datetime.now()}.csv', 'w') as csvf:
         writer = csv.DictWriter(csvf, fieldnames=dms[0].keys())
         writer.writeheader()
@@ -59,7 +66,8 @@ async def get_series_danmu():
         video_list = f.read().splitlines()
         video_list = list(filter(lambda a: not "#" == a[0], video_list))
     is_content = input('just content?: ')
-    for vid in video_list:
+    for url in video_list:
+        vid = url.split("/")[-1].split(".")[0]
         print(f'--- Getting danmus for {vid} ---')
         seg_index_url = f'https://dm.video.qq.com/barrage/base/{vid}'
         r = requests.get(seg_index_url)
@@ -85,10 +93,10 @@ async def get_series_danmu():
 
 
 async def main():
-    vid = input('vid: ')
+    vid = input('video url: ').split("/")[-1].split(".")[0]
     is_variety = input('is variety?: ')
-    is_variety = is_variety.lower() == 'yes'
-    is_content = input('just content?: ')
+    is_variety = is_variety.lower()[0] == 'y'
+    is_content = input('just content?: ').lower()[0] == 'y'
     seg_index_url = f'https://dm.video.qq.com/barrage/base/{vid}'
     r = requests.get(seg_index_url)
     segment_index = r.json()['segment_index']
@@ -113,7 +121,7 @@ async def main():
 
 if __name__ == '__main__':
     start_time = time.time()
-    run_list = input('run list? ').lower() == 'yes'
+    run_list = input('run list? ').lower()[0] == 'y'
     if run_list:
         asyncio.run(get_series_danmu())
     else:
